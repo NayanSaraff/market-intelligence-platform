@@ -247,18 +247,6 @@ If you deploy publicly, keep in mind:
 
 ---
 
-## 👤 Author
-
-| Field | Detail |
-|-------|--------|
-| Name | [YOUR NAME] |
-| Institution | [YOUR UNIVERSITY] |
-| Program | [YOUR PROGRAM] |
-| Supervisor | [FACULTY NAME] |
-| Platform | StockGro |
-
----
-
 ## 📜 License
 
 This project is submitted as part of an academic capstone. All code is original.  
