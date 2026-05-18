@@ -190,23 +190,6 @@ If you deploy publicly, keep in mind:
 
 ---
 
-## 📅 Project Timeline
-
-| Phase | Description | Duration |
-|-------|-------------|----------|
-| 1 | Planning & Setup | Day 1 |
-| 2 | Data Acquisition & EDA | Day 2–3 |
-| 3 | Preprocessing & Features | Day 4 |
-| 4 | Model Building (ARIMA, ETS, Prophet, LSTM) | Day 5–10 |
-| 5 | Volatility Analysis (GARCH) | Day 11 |
-| 6 | Model Evaluation & Comparison | Day 12–13 |
-| 7 | Portfolio Construction | Day 14 |
-| 8 | Trade Instructions & Signal Review | Day 15 |
-| 9 | Dashboard & Visualizations | Day 16–17 |
-| 10 | Report Writing & Final Review | Day 18–20 |
-
----
-
 ## 🏦 Stock Universe (10 NSE Stocks — 5 Sectors)
 
 | # | Ticker | Company | Sector | Role |
