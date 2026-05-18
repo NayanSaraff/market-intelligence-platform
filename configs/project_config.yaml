@@ -1,0 +1,157 @@
+# ============================================================
+# configs/project_config.yaml
+# Master Configuration — StockGro Capstone Project
+# ============================================================
+
+project:
+  name: "Data-Driven Stock Analysis using Time Series Models on StockGro"
+  version: "1.0.0"
+  author: "[YOUR NAME]"
+  institution: "[YOUR UNIVERSITY]"
+  submitted_to: "[FACULTY NAME]"
+  submission_date: "[DATE]"
+
+# ── Date Configuration ────────────────────────────────────────
+dates:
+  full_start: "2021-01-01"
+  full_end:   "2025-12-31"
+  train_start: "2021-01-01"
+  train_end:   "2025-06-30"
+  test_start:  "2025-07-01"
+  test_end:    "2025-12-31"
+  forecast_days: 5
+
+# ── Stock Universe ────────────────────────────────────────────
+stocks:
+  banking:
+    - symbol: "HDFCBANK.NS"
+      name: "HDFC Bank"
+      weight_class: "core"
+    - symbol: "ICICIBANK.NS"
+      name: "ICICI Bank"
+      weight_class: "core"
+
+  it:
+    - symbol: "INFY.NS"
+      name: "Infosys"
+      weight_class: "core"
+    - symbol: "TCS.NS"
+      name: "Tata Consultancy Services"
+      weight_class: "core"
+
+  pharma:
+    - symbol: "SUNPHARMA.NS"
+      name: "Sun Pharmaceutical"
+      weight_class: "satellite"
+    - symbol: "DRREDDY.NS"
+      name: "Dr. Reddy's Laboratories"
+      weight_class: "satellite"
+
+  fmcg:
+    - symbol: "HINDUNILVR.NS"
+      name: "Hindustan Unilever"
+      weight_class: "satellite"
+    - symbol: "ITC.NS"
+      name: "ITC Limited"
+      weight_class: "satellite"
+
+  auto:
+    - symbol: "MARUTI.NS"
+      name: "Maruti Suzuki"
+      weight_class: "tactical"
+    - symbol: "TATAMOTORS.NS"
+      name: "Tata Motors"
+      weight_class: "tactical"
+
+# ── Portfolio Configuration ───────────────────────────────────
+portfolio:
+  total_capital_inr: 1000000       # ₹10,00,000
+  currency: "INR"
+  benchmark: "^NSEI"              # Nifty 50 benchmark
+  risk_free_rate: 0.06            # 6% annualized
+  rebalancing: "monthly"
+  min_stocks: 5
+  max_stocks: 8
+  max_weight_per_stock: 0.25      # Max 25% in any single stock
+  min_weight_per_stock: 0.05      # Min 5% in any single stock
+
+# ── Model Configuration ───────────────────────────────────────
+models:
+  arima:
+    max_p: 5
+    max_d: 2
+    max_q: 5
+    seasonal: false
+    information_criterion: "aic"
+
+  ets:
+    trend: "add"
+    seasonal: "add"
+    seasonal_periods: 252          # Trading days in a year
+
+  prophet:
+    changepoint_prior_scale: 0.05
+    seasonality_mode: "multiplicative"
+    yearly_seasonality: true
+    weekly_seasonality: true
+    daily_seasonality: false
+
+  lstm:
+    lookback_window: 60
+    epochs: 100
+    batch_size: 32
+    hidden_units: [128, 64]
+    dropout: 0.2
+    optimizer: "adam"
+    loss: "mse"
+    validation_split: 0.1
+
+  garch:
+    p: 1
+    q: 1
+    distribution: "normal"
+    mean_model: "Constant"
+
+# ── Evaluation Metrics ────────────────────────────────────────
+evaluation:
+  metrics:
+    - "RMSE"
+    - "MAE"
+    - "MAPE"
+    - "Directional_Accuracy"
+    - "R2"
+  arima_specific:
+    - "AIC"
+    - "BIC"
+    - "Ljung_Box"
+  volatility:
+    - "Annualized_Volatility"
+    - "Rolling_Volatility_30d"
+    - "GARCH_Forecast_Vol"
+  portfolio:
+    - "Expected_Return"
+    - "Portfolio_Volatility"
+    - "Sharpe_Ratio"
+    - "Max_Drawdown"
+    - "VaR_95"
+    - "CVaR_95"
+
+# ── Visualization ─────────────────────────────────────────────
+visualization:
+  figure_dpi: 150
+  figure_size: [14, 7]
+  color_palette: "viridis"
+  chart_style: "seaborn-v0_8-darkgrid"
+  export_format: ["png", "html"]
+
+# ── Paths ─────────────────────────────────────────────────────
+paths:
+  data_raw: "data/raw/"
+  data_processed: "data/processed/"
+  data_features: "data/features/"
+  models: "models/"
+  outputs_charts: "outputs/charts/"
+  outputs_reports: "outputs/reports/"
+  outputs_predictions: "outputs/predictions/"
+  outputs_portfolio: "outputs/portfolio/"
+  logs: "logs/"

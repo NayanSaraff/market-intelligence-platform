@@ -1,0 +1,64 @@
+# ============================================================
+# StockGro Capstone Project — Requirements
+# Data-Driven Stock Analysis using Time Series Models
+# ============================================================
+# Install: pip install -r requirements.txt
+
+# ── Core Data & Numerics ──────────────────────────────────────
+pandas==2.2.2
+numpy==1.26.4
+scipy==1.13.0
+
+# ── Financial Data ────────────────────────────────────────────
+yfinance==0.2.40
+
+# ── Visualization ─────────────────────────────────────────────
+matplotlib==3.8.4
+seaborn==0.13.2
+plotly==5.22.0
+kaleido==0.2.1            # Static image export for plotly
+
+# ── Statistical Models ────────────────────────────────────────
+statsmodels==0.14.2
+pmdarima==2.0.4           # Auto ARIMA
+
+# ── Time Series — Prophet ─────────────────────────────────────
+prophet==1.1.5
+holidays==0.46
+
+# ── Volatility — GARCH ───────────────────────────────────────
+arch==7.0.0
+
+# ── Deep Learning — LSTM ─────────────────────────────────────
+tensorflow==2.16.1
+keras==3.3.3
+scikit-learn==1.4.2
+
+# ── Notebook & Reporting ─────────────────────────────────────
+jupyterlab==4.2.0
+notebook==7.2.0
+ipywidgets==8.1.3
+nbformat==5.10.4
+
+# ── Dashboard ────────────────────────────────────────────────
+streamlit==1.37.1
+dash==2.17.1
+dash-bootstrap-components==1.6.0
+
+# ── Utilities ─────────────────────────────────────────────────
+python-dateutil==2.9.0
+pytz==2024.1
+tqdm==4.66.4
+joblib==1.4.2
+openpyxl==3.1.4           # Excel export
+xlsxwriter==3.2.0         # Excel charting
+tabulate==0.9.0           # Table formatting
+PyYAML==6.0
+
+# ── Report Generation ─────────────────────────────────────────
+reportlab==4.2.0          # PDF reports
+Pillow==10.3.0
+jinja2==3.1.4
+
+# ── Testing ───────────────────────────────────────────────────
+pytest==8.2.0

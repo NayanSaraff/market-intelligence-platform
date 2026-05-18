@@ -1,0 +1,86 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local Streamlit secrets / runtime files
+.streamlit/secrets.toml
+.streamlit/*.log
+
+# Editor / temp files
+*.tmp
+*.bak
+*.orig
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+*.nbconvert.ipynb
+
+# Data (raw data — too large for git)
+data/raw/*.csv
+data/processed/*.csv
+data/features/*.csv
+data/raw/*
+data/processed/*
+data/features/*
+# Keep structure
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/features/.gitkeep
+
+# Model weights (large files)
+models/**/*.h5
+models/**/*.keras
+models/**/*.pkl
+models/**/*.json
+models/**/*.joblib
+models/**/*.pt
+models/**/*.pth
+models/**/*.sav
+# Keep structure
+!models/**/.gitkeep
+
+# Logs
+logs/*
+!logs/.gitkeep
+
+# Generated outputs
+outputs/*
+!outputs/.gitkeep
+!outputs/charts/.gitkeep
+!outputs/forecasts/.gitkeep
+!outputs/metrics/.gitkeep
+!outputs/plots/.gitkeep
+!outputs/portfolio/.gitkeep
+!outputs/predictions/.gitkeep
+!outputs/reports/.gitkeep
+
+# Legacy report folder
+report/*
+!report/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Outputs (keep charts, not large files)
+outputs/reports/*.pdf

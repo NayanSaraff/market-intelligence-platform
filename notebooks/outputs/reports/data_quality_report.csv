@@ -1,0 +1,9 @@
+Ticker,Company,Rows,Missing_BDays,Null_Values,Zero_Volume,Price_Anomalies(>20%),Coverage_%,Status
+ICICIBANK.NS,ICICI Bank,1109,64,0,1,0,94.3,✅ PASS
+INFY.NS,Infosys,1109,64,0,1,0,94.3,✅ PASS
+TCS.NS,TCS,1109,64,0,1,0,94.3,✅ PASS
+SUNPHARMA.NS,Sun Pharma,1109,64,0,1,0,94.3,✅ PASS
+DRREDDY.NS,Dr Reddy's,1109,64,0,1,0,94.3,✅ PASS
+HINDUNILVR.NS,HUL,1109,64,0,1,0,94.3,✅ PASS
+ITC.NS,ITC,1109,64,0,0,0,94.3,✅ PASS
+MARUTI.NS,Maruti,1109,64,0,1,0,94.3,✅ PASS
