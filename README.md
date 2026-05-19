@@ -175,7 +175,9 @@ Open Dashboard - https://market-intelligence-platform-2ha3yqdsagaffhvucael3w.str
 
 Notes
 Requires an internet connection for live market data retrieval from Yahoo Finance.
+
 Initial load may take a few seconds if model artifacts are being loaded.
+
 Best viewed on a desktop or tablet for the full interactive experience.
 
 ## 🏦 Stock Universe (10 NSE Stocks — 5 Sectors)
