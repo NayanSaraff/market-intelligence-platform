@@ -1,0 +1,6 @@
+Model,Avg_RMSE,Avg_MAE,Avg_MAPE_%,Avg_DA_%,Avg_R2,Std_MAPE_%,Best_Stock_Count,Rank_by_MAPE,Strengths,Weaknesses,Verdict
+ARIMA,282.0893,249.6324,8.5772,51.6,-3.1873,3.2622,0,3,"Interpretable, good DA%, fast","High MAPE, linear only, no regime handling",Baseline + ensemble input + diagnostic tool
+ETS,360.3139,327.0368,10.4671,49.68,-5.1906,4.3451,0,4,"Handles seasonality, robust","Highest MAPE, rigid seasonality, no exog vars",Ensemble diversity only; not standalone
+Prophet,386.8995,362.2402,16.3122,54.01,-13.577,8.8863,0,5,"Holiday effects, best DA%","Overfits changepoints, slow, high MAPE",Use during macro events (Budget/RBI/Expiry)
+LSTM,62.7736,50.5201,1.5488,47.44,0.8307,0.3844,8,1,"Best MAPE+RMSE+R², non-linear","Black-box, low DA%, needs GPU at scale",Primary model for all 8 stocks ★★★★★
+Ensemble,118.3021,101.5517,3.3543,46.64,0.3183,1.1342,0,2,"Robust, risk-adjusted, production-ready","Complex maintenance, LSTM-dominated",Recommended for StockGro trading ★★★★★

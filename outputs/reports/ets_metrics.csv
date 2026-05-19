@@ -1,0 +1,9 @@
+Ticker,Company,Model,Config,AIC,RMSE,MAE,MAPE_%,DA_%,R2
+ITC.NS,ITC,ETS(Holt-Additive),"('add', None, None)",3715.37,5.95,4.63,1.0884,44.53,0.9782
+TATAMOTORS.NS,Tata Motors,ETS(Holt-Winters-Mul),"('add', 'mul', 5)",5465.54,15.4171,11.8879,2.2586,50.78,0.8955
+ICICIBANK.NS,ICICI Bank,ETS(Holt-Additive),"('add', None, None)",6139.52,19.8303,15.7687,1.4024,50.0,0.9006
+SUNPHARMA.NS,Sun Pharma,ETS(Holt-Additive),"('add', None, None)",6100.07,26.0538,20.6502,1.5083,46.09,0.9206
+HDFCBANK.NS,HDFC Bank,ETS(Holt-Additive),"('add', None, None)",6623.36,27.5157,20.7165,1.1514,51.56,0.8461
+INFY.NS,Infosys,ETS(Holt-Additive),"('add', None, None)",6541.75,42.7348,33.3957,1.2249,52.34,0.8721
+DRREDDY.NS,Dr Reddy's,ETS(Holt-Additive),"('add', None, None)",9921.57,99.5242,77.5981,1.3774,44.53,0.7788
+MARUTI.NS,Maruti,ETS(Holt-Additive),"('add', None, None)",10746.71,231.6079,179.4485,1.52,40.62,0.8231

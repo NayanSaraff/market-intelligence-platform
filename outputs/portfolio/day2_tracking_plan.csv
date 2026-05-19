@@ -1,0 +1,9 @@
+Ticker,Company,Shares_Held,Entry_Price,Stop_Loss,Target,Unrealised_PnL_on_D2,Stop_Loss_Distance_%,Target_Distance_%,Daily_Loss_Limit_₹,Action_if_SL_Hit,Action_if_Target_Hit,Rebalance_Trigger
+ITC.NS,ITC,526,436.09,379.23,487.71,CHECK LIVE,13.04,11.84,7438.0,EXIT FULL POSITION immediately,Book 50% profit; trail SL to entry,Weight deviation >3% from target
+SUNPHARMA.NS,Sun Pharma,146,1535.62,1311.33,1396.78,CHECK LIVE,14.61,-9.04,8154.0,EXIT FULL POSITION immediately,Book 50% profit; trail SL to entry,Weight deviation >3% from target
+TATAMOTORS.NS,Tata Motors,227,592.97,463.25,518.55,CHECK LIVE,21.88,-12.55,7366.0,EXIT FULL POSITION immediately,Book 50% profit; trail SL to entry,Weight deviation >3% from target
+INFY.NS,Infosys,38,2946.63,2548.01,2429.02,CHECK LIVE,13.53,-17.57,3768.0,EXIT FULL POSITION immediately,Book 50% profit; trail SL to entry,Weight deviation >3% from target
+HDFCBANK.NS,HDFC Bank,42,1924.97,1700.1,1814.0,CHECK LIVE,11.68,-5.76,2344.0,EXIT FULL POSITION immediately,Book 50% profit; trail SL to entry,Weight deviation >3% from target
+ICICIBANK.NS,ICICI Bank,63,1239.32,1052.31,1070.12,CHECK LIVE,15.09,-13.65,2935.0,EXIT FULL POSITION immediately,Book 50% profit; trail SL to entry,Weight deviation >3% from target
+MARUTI.NS,Maruti,5,12742.4,10749.65,11607.53,CHECK LIVE,15.64,-8.91,2484.0,EXIT FULL POSITION immediately,Book 50% profit; trail SL to entry,Weight deviation >3% from target
+DRREDDY.NS,Dr Reddy's,10,6009.18,5200.46,6057.16,CHECK LIVE,13.46,0.8,2012.0,EXIT FULL POSITION immediately,Book 50% profit; trail SL to entry,Weight deviation >3% from target

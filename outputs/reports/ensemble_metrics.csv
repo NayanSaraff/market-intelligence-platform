@@ -1,0 +1,9 @@
+Ticker,Company,Model,Sector,AIC,BIC,RMSE,MAE,MAPE_%,DA_%,R2,Lookback,Weights,Model_Group
+ITC.NS,ITC,Ensemble,FMCG,,,9.6611,8.1466,1.7877,41.03,0.8901,,"{'ARIMA': 0.115, 'ETS': 0.146, 'Prophet': 0.058, 'LSTM': 0.68}",Ensemble
+SUNPHARMA.NS,Sun Pharma,Ensemble,Pharma,,,60.9387,55.2561,4.2414,42.31,0.2432,,"{'ARIMA': 0.088, 'ETS': 0.076, 'Prophet': 0.139, 'LSTM': 0.698}",Ensemble
+TATAMOTORS.NS,Tata Motors,Ensemble,Auto,,,32.8745,28.798,5.3888,50.0,0.0874,,"{'ARIMA': 0.176, 'ETS': 0.148, 'Prophet': 0.057, 'LSTM': 0.619}",Ensemble
+ICICIBANK.NS,ICICI Bank,Ensemble,Banking,,,45.0247,39.458,3.5249,48.72,0.2661,,"{'ARIMA': 0.129, 'ETS': 0.107, 'Prophet': 0.049, 'LSTM': 0.715}",Ensemble
+INFY.NS,Infosys,Ensemble,IT,,,72.5546,57.3717,2.1959,57.69,0.6498,,"{'ARIMA': 0.124, 'ETS': 0.085, 'Prophet': 0.097, 'LSTM': 0.694}",Ensemble
+MARUTI.NS,Maruti,Ensemble,Auto,,,438.1714,375.8172,3.2313,39.74,0.3655,,"{'ARIMA': 0.136, 'ETS': 0.098, 'Prophet': 0.22, 'LSTM': 0.546}",Ensemble
+DRREDDY.NS,Dr Reddy's,Ensemble,Pharma,,,227.25,195.4659,3.555,46.15,0.0808,,"{'ARIMA': 0.154, 'ETS': 0.14, 'Prophet': 0.056, 'LSTM': 0.65}",Ensemble
+HDFCBANK.NS,HDFC Bank,Ensemble,Banking,,,59.9419,52.0998,2.9097,47.44,-0.0368,,"{'ARIMA': 0.155, 'ETS': 0.139, 'Prophet': 0.077, 'LSTM': 0.629}",Ensemble

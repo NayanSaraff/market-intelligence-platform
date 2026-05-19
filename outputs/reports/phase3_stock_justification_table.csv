@@ -1,0 +1,9 @@
+Ticker,Company,Sector,Total_Return_%,Ann_Return_%,Ann_Volatility_%,Sharpe_Ratio,Max_Drawdown_%,ADX_Trend_Str,Current_Trend,Forecastability,Composite_Score,Selection_Reason
+ITC.NS,ITC,FMCG,126.1%,21.3%,24.7%,0.620,-39.4%,24.0,📈 Uptrend,★★☆ Moderate,7.82,"Strongest Sharpe (0.62), low volatility, FMCG anchor"
+SUNPHARMA.NS,Sun Pharma,Pharma,114.5%,21.3%,29.2%,0.526,-35.2%,36.1,📈 Uptrend,★★★ Easy,7.32,"Highest ADX trend strength, defensive pharma leader"
+TATAMOTORS.NS,Tata Motors,Auto,157.7%,29.7%,41.2%,0.575,-58.9%,18.5,📉 Downtrend,★★☆ Moderate,6.59,"Highest total return (157%), auto cyclical alpha"
+ICICIBANK.NS,ICICI Bank,Banking,60.0%,14.3%,27.5%,0.302,-41.2%,32.7,📉 Downtrend,★★★ Easy,5.90,"Banking sector must-have, high ADX, strong growth"
+INFY.NS,Infosys,IT,68.3%,14.3%,23.1%,0.361,-30.5%,20.1,📉 Downtrend,★★☆ Moderate,5.42,"IT sector representative, lower vol than peers"
+MARUTI.NS,Maruti,Auto,59.7%,14.4%,28.0%,0.300,-39.2%,24.4,📈 Uptrend,★★☆ Moderate,4.98,"Auto diversifier, market share dominance hedge"
+DRREDDY.NS,Dr Reddy's,Pharma,34.6%,10.9%,29.1%,0.168,-50.0%,19.0,📈 Uptrend,★★☆ Moderate,3.79,"Second pharma for sector depth, global exposure"
+HDFCBANK.NS,HDFC Bank,Banking,23.7%,7.2%,22.2%,0.056,-27.4%,16.1,📈 Uptrend,★★☆ Moderate,3.60,"Most liquid NSE stock, portfolio stability anchor"

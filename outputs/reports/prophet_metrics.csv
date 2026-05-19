@@ -1,0 +1,9 @@
+Ticker,Company,Model,Sector,AIC,BIC,RMSE,MAE,MAPE_%,DA_%,R2,Lookback,Weights,Model_Group
+ITC.NS,ITC,Prophet-Style,FMCG,,,66.9599,62.5358,14.176,51.28,-4.279,,,Prophet
+SUNPHARMA.NS,Sun Pharma,Prophet-Style,Pharma,,,136.0343,126.4575,9.7202,52.56,-2.7711,,,Prophet
+TATAMOTORS.NS,Tata Motors,Prophet-Style,Auto,,,179.1687,172.9263,32.0317,60.26,-26.1083,,,Prophet
+ICICIBANK.NS,ICICI Bank,Prophet-Style,Banking,,,277.9281,271.2991,23.9724,53.85,-26.965,,,Prophet
+INFY.NS,Infosys,Prophet-Style,IT,,,350.3782,326.312,11.9193,53.85,-7.1659,,,Prophet
+MARUTI.NS,Maruti,Prophet-Style,Auto,,,622.0845,516.0259,4.3968,55.13,-0.2789,,,Prophet
+DRREDDY.NS,Dr Reddy's,Prophet-Style,Pharma,,,1224.5517,1189.905,21.4018,48.72,-25.6907,,,Prophet
+HDFCBANK.NS,HDFC Bank,Prophet-Style,Banking,,,238.0903,232.4598,12.8797,56.41,-15.3572,,,Prophet

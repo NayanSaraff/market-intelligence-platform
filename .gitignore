@@ -61,13 +61,20 @@ logs/*
 # Generated outputs
 outputs/*
 !outputs/.gitkeep
-!outputs/charts/.gitkeep
+!outputs/charts/
+!outputs/charts/**
+!outputs/portfolio/
+!outputs/portfolio/**
+!outputs/predictions/
+!outputs/predictions/**
+!outputs/reports/
+!outputs/reports/**
+!outputs/forecasts/
 !outputs/forecasts/.gitkeep
+!outputs/metrics/
 !outputs/metrics/.gitkeep
+!outputs/plots/
 !outputs/plots/.gitkeep
-!outputs/portfolio/.gitkeep
-!outputs/predictions/.gitkeep
-!outputs/reports/.gitkeep
 
 # Legacy report folder
 report/*

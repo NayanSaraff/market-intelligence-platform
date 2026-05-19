@@ -1,0 +1,9 @@
+Ticker,Company,ADF_Price_p,Price_Stationary,ADF_Return_p,Return_Stationary,Required_d
+ITC.NS,ITC,0.6066,False,0.0,True,1
+SUNPHARMA.NS,Sun Pharma,0.8118,False,0.0,True,1
+TATAMOTORS.NS,Tata Motors,0.5137,False,0.0,True,1
+ICICIBANK.NS,ICICI Bank,0.5204,False,0.0,True,1
+INFY.NS,Infosys,0.9918,False,0.0,True,1
+MARUTI.NS,Maruti,0.5109,False,0.0,True,1
+DRREDDY.NS,Dr Reddy's,0.2499,False,0.0,True,1
+HDFCBANK.NS,HDFC Bank,0.5298,False,0.0,True,1

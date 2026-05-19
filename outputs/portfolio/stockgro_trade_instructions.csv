@@ -1,0 +1,9 @@
+Ticker,Company,Sector,Portfolio_Role,Portfolio_Weight_%,Shares_to_Buy,Amount_INR,Current_Price_INR,Entry_Price_INR,Target_Price_INR,Stop_Loss_INR,Forecast_5d_%,Signal,Risk_Reward_Ratio,GARCH_Vol_%,VaR_95_%,Ann_Return_%,Rationale
+ITC.NS,ITC,FMCG,Core,22.93,526,228926.0,435.22,436.09,487.71,379.23,12.06,BUY,0.94,25.73,-2.587,20.72,Ensemble forecast: +12.06% in 5d; GARCH vol=25.7%; Sharpe=0.81
+SUNPHARMA.NS,Sun Pharma,Pharma,Core,22.41,146,223752.0,1532.55,1535.62,1396.78,1311.33,-8.86,SELL,0.61,28.87,-2.928,18.22,Ensemble forecast: -8.86% in 5d; GARCH vol=28.9%; Sharpe=0.63
+TATAMOTORS.NS,Tata Motors,Auto,Satellite,13.45,227,134336.0,591.79,592.97,518.55,463.25,-12.38,SELL,0.57,43.44,-4.032,22.74,Ensemble forecast: -12.38% in 5d; GARCH vol=43.4%; Sharpe=0.52
+INFY.NS,Infosys,IT,Satellite,11.35,38,111748.0,2940.75,2946.63,2429.02,2548.01,-17.4,SELL,1.3,26.71,-2.356,12.55,Ensemble forecast: -17.40% in 5d; GARCH vol=26.7%; Sharpe=0.47
+HDFCBANK.NS,HDFC Bank,Banking,Tactical,8.18,42,80687.0,1921.13,1924.97,1814.0,1700.1,-5.58,SELL,0.48,23.01,-2.247,5.11,Ensemble forecast: -5.58% in 5d; GARCH vol=23.0%; Sharpe=0.22
+ICICIBANK.NS,ICICI Bank,Banking,Tactical,7.88,63,77922.0,1236.85,1239.32,1070.12,1052.31,-13.48,SELL,0.9,29.84,-2.749,11.18,Ensemble forecast: -13.48% in 5d; GARCH vol=29.8%; Sharpe=0.37
+MARUTI.NS,Maruti,Auto,Tactical,7.21,5,63585.0,12716.97,12742.4,11607.53,10749.65,-8.72,SELL,0.56,30.94,-2.87,11.21,Ensemble forecast: -8.72% in 5d; GARCH vol=30.9%; Sharpe=0.36
+DRREDDY.NS,Dr Reddy's,Pharma,Tactical,6.58,10,59972.0,5997.19,6009.18,6057.16,5200.46,0.75,BUY,0.08,26.57,-2.916,7.53,Ensemble forecast: +0.75% in 5d; GARCH vol=26.6%; Sharpe=0.28
