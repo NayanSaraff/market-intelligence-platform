@@ -173,7 +173,7 @@ Access the deployed Streamlit dashboard here:
 
 Open Dashboard - https://market-intelligence-platform-2ha3yqdsagaffhvucael3w.streamlit.app/
 
-# Notes:
+### Notes:
 
 Requires an internet connection for live market data retrieval from Yahoo Finance.
 
