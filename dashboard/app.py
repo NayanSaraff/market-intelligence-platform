@@ -4,16 +4,22 @@ from __future__ import annotations
 
 import contextlib
 import io
+import logging
 from datetime import datetime
 from pathlib import Path
+from statistics import NormalDist
 
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import pytz
 import streamlit as st
 import yfinance as yf
+
+logging.getLogger("yfinance").setLevel(logging.ERROR)
+logging.getLogger("urllib3").setLevel(logging.ERROR)
 
 try:
     from dashboard import plotly_charts
@@ -30,14 +36,47 @@ PREDICTIONS_DIR = OUTPUTS_DIR / "predictions"
 IST = pytz.timezone("Asia/Kolkata")
 
 TAB_LABELS = ["Overview", "EDA", "Model Results", "Forecast", "Volatility", "Portfolio", "Execution"]
-TERMINAL_LAYOUT = {
-    "template": "plotly_dark",
-    "margin": dict(l=24, r=24, t=48, b=24),
-    "paper_bgcolor": "#10151c",
-    "plot_bgcolor": "#10151c",
-    "font": dict(color="#e6edf5", family="Inter, Arial, sans-serif"),
-    "legend": dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-}
+TERMINAL_TITLE = dict(font=dict(size=11, color="#c8d4e8"), x=0.01, xanchor="left")
+TERMINAL_LAYOUT = dict(
+    paper_bgcolor="#080c14",
+    plot_bgcolor="#090d15",
+    font=dict(family="JetBrains Mono, monospace", color="#8aa0bb", size=10),
+    xaxis=dict(
+        gridcolor="#111d2c", linecolor="#1a2535", zeroline=False,
+        tickcolor="#2a3d55", tickfont=dict(size=9, color="#4a6070"),
+        showgrid=True, gridwidth=0.5,
+    ),
+    yaxis=dict(
+        gridcolor="#111d2c", linecolor="#1a2535", zeroline=False,
+        tickcolor="#2a3d55", tickfont=dict(size=9, color="#4a6070"),
+        showgrid=True, gridwidth=0.5,
+    ),
+    legend=dict(
+        bgcolor="#0a101a", bordercolor="#1a2535", borderwidth=1,
+        font=dict(size=9, color="#8aa0bb"),
+        orientation="h", yanchor="bottom", y=1.02,
+        xanchor="left", x=0,
+    ),
+    margin=dict(l=48, r=16, t=36, b=36),
+    hovermode="x unified",
+    hoverlabel=dict(
+        bgcolor="#0a101a", bordercolor="#00aadd",
+        font_color="#c8d4e8", font_size=10,
+        font_family="JetBrains Mono, monospace",
+    ),
+    modebar=dict(bgcolor="#080c14", color="#2a3d55", activecolor="#00aadd"),
+)
+
+
+def terminal_layout(title=None, **overrides):
+    layout = TERMINAL_LAYOUT.copy()
+    if title is not None:
+        title_layout = TERMINAL_TITLE.copy()
+        title_layout["text"] = title
+        layout["title"] = title_layout
+    layout.update(overrides)
+    return layout
+
 
 STOCK_COLORS = {
     "DRREDDY.NS": "#00d4ff",
@@ -57,6 +96,8 @@ MODEL_COLORS = {
     "LSTM": "#f59e0b",
     "Ensemble": "#00ff88",
 }
+
+YFINANCE_SKIP_TICKERS = {"TATAMOTORS.NS"}
 
 _DEFAULT_STOCK_UNIVERSE = pd.DataFrame(
     [
@@ -87,6 +128,9 @@ def load_csv(path: str) -> pd.DataFrame:
 def fetch_live_prices(tickers: list[str]) -> dict:
     prices: dict[str, dict] = {}
     for ticker in tickers:
+        if ticker in YFINANCE_SKIP_TICKERS:
+            prices[ticker] = {"price": np.nan}
+            continue
         price = np.nan
         try:
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
@@ -99,14 +143,14 @@ def fetch_live_prices(tickers: list[str]) -> dict:
     return prices
 
 
-@st.cache_data(show_spinner=False)
-def load_all_ohlc(tickers: list[str], start: str = "2021-01-01") -> pd.DataFrame:
+@st.cache_data(ttl=1800)
+def load_all_ohlc(tickers, start="2021-01-01"):
+    tickers = [ticker for ticker in tickers if ticker not in YFINANCE_SKIP_TICKERS]
     if not tickers:
         return pd.DataFrame()
 
     try:
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-            return yf.download(tickers, start=start, auto_adjust=True, progress=False)
+        return yf.download(tickers, start=start, auto_adjust=True, progress=False)["Close"]
     except Exception:
         return pd.DataFrame()
 
@@ -145,29 +189,29 @@ def load_price_data(start: str = "2021-01-01") -> pd.DataFrame:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_ohlc(ticker: str, period: str = "6mo") -> pd.DataFrame:
-    raw = ALL_OHLC_DATA if "ALL_OHLC_DATA" in globals() else pd.DataFrame()
-    df = pd.DataFrame()
+    if ticker in YFINANCE_SKIP_TICKERS:
+        return pd.DataFrame()
 
-    if not raw.empty and isinstance(raw.columns, pd.MultiIndex):
-        try:
-            if ticker in raw.columns.get_level_values(-1):
-                df = raw.xs(ticker, axis=1, level=-1).copy().reset_index()
-        except Exception:
-            df = pd.DataFrame()
-
-    if df.empty:
-        try:
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                df = yf.download(ticker, period=period, interval="1d", auto_adjust=True, progress=False)
-        except Exception:
-            return pd.DataFrame()
+    try:
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            df = yf.download(ticker, period=period, interval="1d", auto_adjust=True, progress=False)
+    except Exception:
+        return pd.DataFrame()
 
     if df.empty:
         return pd.DataFrame()
 
-    if "Date" not in df.columns:
-        df = df.reset_index()
+    if isinstance(df.columns, pd.MultiIndex):
+        flat_cols: list[str] = []
+        for col in df.columns:
+            if isinstance(col, tuple):
+                non_empty = [str(part) for part in col if part and str(part) != "nan"]
+                flat_cols.append(non_empty[0] if non_empty else "")
+            else:
+                flat_cols.append(str(col))
+        df.columns = flat_cols
 
+    df = df.reset_index()
     date_col = next((c for c in ["Date", "Datetime", "index"] if c in df.columns), None)
     if date_col and date_col != "Date":
         df = df.rename(columns={date_col: "Date"})
@@ -177,7 +221,11 @@ def fetch_ohlc(ticker: str, period: str = "6mo") -> pd.DataFrame:
         cutoff = pd.Timestamp.today() - pd.DateOffset(months=6)
         df = df[df["Date"] >= cutoff]
 
-    return df
+    required = [c for c in ["Open", "High", "Low", "Close"] if c in df.columns]
+    if len(required) < 4:
+        return pd.DataFrame()
+
+    return df[["Date", "Open", "High", "Low", "Close"] + (["Volume"] if "Volume" in df.columns else [])].dropna(subset=["Date"])
 
 
 def compute_portfolio_snapshot(portfolio_df: pd.DataFrame, live_prices: dict) -> tuple[float, float, float]:
@@ -225,6 +273,23 @@ def kpi_card(label: str, value: str, accent: str = "#00d4ff", subtitle: str = ""
         f'<div class="kpi-card"><div class="kpi-label">{label}</div>'
         f'<div class="kpi-value" style="color:{accent}">{value}</div>'
         f'<div class="kpi-subtitle {extra_class}">{subtitle}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def alert_box(level: str, message: str) -> None:
+    level_key = str(level).strip().lower()
+    level_map = {
+        "warning": ("WARNING", "alert-warning"),
+        "info": ("INFO", "alert-info"),
+        "success": ("INFO", "alert-info"),
+        "error": ("CRITICAL", "alert-critical"),
+        "critical": ("CRITICAL", "alert-critical"),
+    }
+    label, css_class = level_map.get(level_key, ("INFO", "alert-info"))
+    st.markdown(
+        f"<div class='alert-box {css_class}'><span class='alert-level'>{label}</span>"
+        f"<span class='alert-message'>{message}</span></div>",
         unsafe_allow_html=True,
     )
 
@@ -289,14 +354,22 @@ def style_ensemble_error(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def style_forecast_table(df: pd.DataFrame) -> pd.io.formats.style.Styler:
+    if df.empty:
+        return df.style
+    styles = pd.DataFrame("", index=df.index, columns=df.columns)
+    if "Model" in df.columns:
+        ens_mask = df["Model"].astype(str).str.lower().str.contains("ensemble")
+        for col in df.columns:
+            styles.loc[ens_mask, col] = "background-color:#0a1418; border-top:1px solid #ff6600; color:#e8f3f8; font-weight:700"
+    return df.style.apply(lambda _: styles, axis=None)
+
+
 STOCK_UNIVERSE = load_csv(str(PORTFOLIO_DIR / "final_portfolio_allocation.csv"))
 if STOCK_UNIVERSE.empty or "Ticker" not in STOCK_UNIVERSE.columns:
     STOCK_UNIVERSE = _DEFAULT_STOCK_UNIVERSE.copy()
 
 ALL_OHLC_DATA = load_all_ohlc(STOCK_UNIVERSE["Ticker"].dropna().astype(str).tolist())
-
-if "selected_stock" not in st.session_state or st.session_state.selected_stock not in STOCK_UNIVERSE["Ticker"].tolist():
-    st.session_state.selected_stock = STOCK_UNIVERSE["Ticker"].iloc[0]
 
 EDA_CHARTS = {
     "Price Trends": CHARTS_DIR / "eda_p5" / "EDA_01_price_panels.png",
@@ -401,7 +474,14 @@ def market_status_banner() -> None:
 
 def ticker_tape(portfolio_df: pd.DataFrame, live_prices: dict) -> None:
     """Render scrolling ticker tape for portfolio stocks."""
-    if portfolio_df.empty or "Ticker" not in portfolio_df.columns:
+    if portfolio_df.empty:
+        st.markdown(
+            '<div class="ticker-tape"><div class="ticker-inner">NO DATA LOADED</div></div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    if "Ticker" not in portfolio_df.columns:
         st.markdown(
             '<div class="ticker-tape"><div class="ticker-inner">NO DATA</div></div>',
             unsafe_allow_html=True,
@@ -502,8 +582,13 @@ st.set_page_config(
     page_title="StockGro Terminal",
     page_icon="📈",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
+
+if "selected_stock" not in st.session_state:
+    st.session_state.selected_stock = STOCK_UNIVERSE["Ticker"].iloc[0]
+elif st.session_state.selected_stock not in STOCK_UNIVERSE["Ticker"].tolist():
+    st.session_state.selected_stock = STOCK_UNIVERSE["Ticker"].iloc[0]
 
 st.markdown(
     """
@@ -535,7 +620,7 @@ html, body, [class*="css"] {
 }
 
 body {
-    padding-top: 98px;
+    padding-top: 76px;
 }
 
 /* Fixed terminal header */
@@ -848,6 +933,72 @@ div[data-testid="stDataFrame"] div[role="grid"] {
     font-size: 11px !important;
 }
 
+/* Compact dataframe font */
+div[data-testid="stDataFrame"] div[role="grid"] {
+    font-size: 10px !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    line-height: 1.5 !important;
+}
+
+/* Remove ugly delta SVG arrow from st.metric */
+[data-testid="stMetricDelta"] svg { display: none !important; }
+
+/* Flatten st.info / st.warning boxes */
+[data-testid="stAlert"] {
+    background: #0a1018 !important;
+    border: 1px solid #1a2535 !important;
+    border-radius: 2px !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 10px !important;
+    color: #6a8aaa !important;
+}
+
+/* Compact st.metric style */
+[data-testid="stMetric"] {
+    background: #0a1018;
+    border: 1px solid #1a2535;
+    padding: 8px 12px;
+    border-radius: 2px;
+}
+[data-testid="stMetricLabel"] {
+    font-size: 8px !important;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: #3a5070 !important;
+}
+[data-testid="stMetricValue"] {
+    font-size: 16px !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    color: #00aadd !important;
+}
+
+/* kpi-value: clamp so it doesn't overflow narrow columns */
+.kpi-value {
+    font-size: clamp(1rem, 1.4vw, 1.5rem) !important;
+}
+
+/* Spinner text */
+[data-testid="stSpinner"] p {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 9px !important;
+    color: #2a3d55 !important;
+    letter-spacing: .1em;
+}
+
+/* Remove max-width center bleed */
+.block-container {
+    padding-top: 0.5rem !important;
+    max-width: 100% !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+}
+
+/* Thin scrollbar on dataframes */
+div[data-testid="stDataFrame"] .dvn-scroller {
+    scrollbar-width: thin;
+    scrollbar-color: #1a2535 #080c14;
+}
+
 /* Inputs */
 .stButton>button,
 .stDownloadButton>button {
@@ -903,11 +1054,11 @@ global_stock = st.session_state.selected_stock
 
 st.set_option("client.showErrorDetails", False)
 
-# ── Fetch Live Prices ──────────────────────────
-live_prices = fetch_live_prices(STOCK_UNIVERSE["Ticker"].tolist())
-
 dashboard_portfolio_df = load_csv(str(PORTFOLIO_DIR / "final_portfolio_allocation.csv"))
 dashboard_summary_df = load_csv(str(PORTFOLIO_DIR / "portfolio_metrics_summary.csv"))
+
+# ── Fetch Live Prices ──────────────────────────
+live_prices = fetch_live_prices(STOCK_UNIVERSE["Ticker"].tolist())
 
 render_terminal_shell(dashboard_portfolio_df, dashboard_summary_df, live_prices)
 # ── Main Tabs ──────────────────────────────
@@ -924,24 +1075,24 @@ with tab1:
     st.markdown("")
     panel_header("PORTFOLIO COMMAND CENTER")
     
-    cols = st.columns(8)
-    with cols[0]:
-        kpi_card("CAPITAL", "₹10L", "#00d4ff")
-    with cols[1]:
-        kpi_card("INVESTED", "₹9.8L", "#00d4ff")
-    with cols[2]:
-        pnl = 5000
-        kpi_card("LIVE P&L", fmt_inr(pnl), "#00ff88" if pnl >= 0 else "#ff3366", f"+2.3%" if pnl >= 0 else "-1.2%", pnl >= 0)
-    with cols[3]:
-        kpi_card("EXP RET", "15.92%", "#00ff88")
-    with cols[4]:
-        kpi_card("SHARPE", "0.53", "#ffaa00")
-    with cols[5]:
-        kpi_card("MAX DD", "-32.98%", "#ff3366", "Historical")
-    with cols[6]:
-        kpi_card("PORT VOL", "18.64%", "#ffaa00")
-    with cols[7]:
-        kpi_card("CASH RSV", "₹19K", "#00d4ff")
+    row1 = st.columns(4)
+    row2 = st.columns(4)
+    with row1[0]:
+        kpi_card("CAPITAL", "₹10L", "#00aadd")
+    with row1[1]:
+        kpi_card("INVESTED", "₹9.81L", "#00aadd")
+    with row1[2]:
+        kpi_card("LIVE P&L", "+₹4.8K", "#00cc66", "+0.49%", True)
+    with row1[3]:
+        kpi_card("EXP RET", "15.92%", "#00cc66")
+    with row2[0]:
+        kpi_card("SHARPE", "0.53", "#ddaa00")
+    with row2[1]:
+        kpi_card("MAX DD", "−32.98%", "#ff3366")
+    with row2[2]:
+        kpi_card("PORT VOL", "18.64%", "#ddaa00")
+    with row2[3]:
+        kpi_card("CASH RSV", "₹19K", "#00aadd")
     
     st.markdown("")
     col_left, col_center, col_right = st.columns([5, 4, 3])
@@ -1024,7 +1175,7 @@ with tab2:
         summary_stats = load_csv(str(REPORTS_DIR / "summary_statistics.csv"))
         stationarity = load_csv(str(REPORTS_DIR / "stationarity_report.csv"))
     
-    col_left, col_right = st.columns([2, 5])
+    col_left, col_right = st.columns([2, 6])
     
     with col_left:
         panel_header("CHART SELECTOR")
@@ -1062,9 +1213,8 @@ with tab2:
         panel_header("MARKET ANALYSIS CHART")
         price_df = load_price_data()
 
-        if price_df.empty:
-            st.warning("Live/downloaded close-price history is unavailable. Showing static chart fallback.")
-            show_image(chart_map.get(chart_option, chart_map["Price Trends"]))
+        if price_df.empty and chart_option != "Risk-Return":
+            alert_box("warning", "Live/downloaded close-price history is unavailable. Plotly charts need price data to render.")
         elif chart_option == "Price Trends":
             norm = price_df / price_df.iloc[0] * 100
             fig = go.Figure()
@@ -1078,7 +1228,7 @@ with tab2:
                         hovertemplate="%{x|%d %b %Y}<br>Idx: %{y:.1f}<extra></extra>",
                     )
                 )
-            fig.update_layout(**TERMINAL_LAYOUT, title="Normalized Price Index (Base=100)")
+            fig.update_layout(**terminal_layout("Normalized Price Index (Base=100)"))
             st.plotly_chart(fig, width="stretch")
         elif chart_option == "Rolling Vol":
             returns = price_df.pct_change()
@@ -1093,7 +1243,7 @@ with tab2:
                         line=dict(color=STOCK_COLORS.get(col, "#00d4ff"), width=1.5),
                     )
                 )
-            fig.update_layout(**TERMINAL_LAYOUT, title="20-Day Rolling Annualized Volatility (%)")
+            fig.update_layout(**terminal_layout("20-Day Rolling Annualized Volatility (%)"))
             st.plotly_chart(fig, width="stretch")
         elif chart_option == "Correlation":
             corr = price_df.pct_change().corr()
@@ -1111,7 +1261,7 @@ with tab2:
                     hovertemplate="%{y} vs %{x}: %{z:.3f}<extra></extra>",
                 )
             )
-            fig.update_layout(**TERMINAL_LAYOUT, title="Return Correlation Heatmap")
+            fig.update_layout(**terminal_layout("Return Correlation Heatmap"))
             st.plotly_chart(fig, width="stretch")
         elif chart_option == "Return Dist":
             returns = price_df.pct_change().dropna() * 100
@@ -1130,7 +1280,7 @@ with tab2:
                         line_color=STOCK_COLORS.get(col, "#00d4ff"),
                     )
                 )
-            fig.update_layout(**TERMINAL_LAYOUT, title="Daily Return Distributions (%)")
+            fig.update_layout(**terminal_layout("Daily Return Distributions (%)"))
             st.plotly_chart(fig, width="stretch")
         elif chart_option == "Cum Returns":
             cum = (1 + price_df.pct_change()).cumprod() - 1
@@ -1145,22 +1295,22 @@ with tab2:
                         hovertemplate="%{x|%b %Y}: %{y:.1f}%<extra></extra>",
                     )
                 )
-            fig.update_layout(**TERMINAL_LAYOUT, title="Cumulative Returns (%)")
+            fig.update_layout(**terminal_layout("Cumulative Returns (%)"))
             st.plotly_chart(fig, width="stretch")
         elif chart_option == "Monthly Returns":
             monthly = price_df.resample("ME").last().pct_change() * 100
-            ticker_sel = st.selectbox(
+            available_tickers = [ticker for ticker in STOCK_UNIVERSE["Ticker"].tolist() if ticker in monthly.columns]
+            st.session_state.selected_stock = st.selectbox(
                 "Stock",
-                price_df.columns.tolist(),
-                index=price_df.columns.tolist().index(st.session_state.selected_stock)
-                if st.session_state.selected_stock in price_df.columns.tolist()
+                available_tickers or monthly.columns.tolist(),
+                index=(available_tickers or monthly.columns.tolist()).index(st.session_state.selected_stock)
+                if st.session_state.selected_stock in (available_tickers or monthly.columns.tolist())
                 else 0,
-                key="monthly_ret_sel",
+                key="stock_sel_eda",
             )
-            st.session_state.selected_stock = ticker_sel
-            s = monthly[ticker_sel].dropna()
+            s = monthly[st.session_state.selected_stock].dropna()
             if s.empty:
-                st.info("Not enough monthly data to render this heatmap yet.")
+                alert_box("info", "Not enough monthly data to render this heatmap yet.")
             else:
                 month_order = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
                 pivot = pd.DataFrame({"year": s.index.year, "month": s.index.strftime("%b"), "val": s.values}).pivot(
@@ -1180,10 +1330,167 @@ with tab2:
                         hovertemplate="Year %{y} %{x}: %{z:.2f}%<extra></extra>",
                     )
                 )
-                fig.update_layout(**TERMINAL_LAYOUT, title=f"Monthly Returns — {ticker_sel.replace('.NS', '')}")
+                fig.update_layout(**terminal_layout(f"Monthly Returns — {st.session_state.selected_stock.replace('.NS', '')}"))
+                st.plotly_chart(fig, width="stretch")
+        elif chart_option == "Q-Q Plots":
+            returns = price_df.pct_change().dropna() * 100
+            fig = go.Figure()
+            for col in returns.columns:
+                sample = returns[col].dropna().to_numpy(dtype=float)
+                sample = sample[np.isfinite(sample)]
+                if len(sample) < 10:
+                    continue
+                sample = (sample - sample.mean()) / sample.std(ddof=1)
+                sample = np.sort(sample)
+                probs = (np.arange(1, len(sample) + 1) - 0.5) / len(sample)
+                theoretical = np.array([NormalDist().inv_cdf(float(p)) for p in probs])
+                fig.add_trace(
+                    go.Scattergl(
+                        x=theoretical,
+                        y=sample,
+                        mode="markers",
+                        name=col.replace(".NS", ""),
+                        marker=dict(color=STOCK_COLORS.get(col, "#00d4ff"), size=4, opacity=0.45),
+                        hovertemplate="Normal q: %{x:.2f}<br>Return q: %{y:.2f}<extra></extra>",
+                    )
+                )
+            if fig.data:
+                all_x = np.concatenate([np.asarray(trace.x, dtype=float) for trace in fig.data])
+                all_y = np.concatenate([np.asarray(trace.y, dtype=float) for trace in fig.data])
+                lo = float(np.nanmin([all_x.min(), all_y.min()]))
+                hi = float(np.nanmax([all_x.max(), all_y.max()]))
+                fig.add_trace(
+                    go.Scatter(
+                        x=[lo, hi],
+                        y=[lo, hi],
+                        mode="lines",
+                        name="Normal reference",
+                        line=dict(color="#ffaa00", width=1.5, dash="dot"),
+                        hoverinfo="skip",
+                    )
+                )
+                fig.update_layout(**terminal_layout("Q-Q Plot of Standardized Daily Returns"))
+                st.plotly_chart(fig, width="stretch")
+            else:
+                alert_box("info", "Not enough return observations to render Q-Q plots.")
+        elif chart_option == "STL Decomp":
+            ticker_options = [ticker for ticker in STOCK_UNIVERSE["Ticker"].tolist() if ticker in price_df.columns]
+            available_tickers = ticker_options or price_df.columns.tolist()
+            st.session_state.selected_stock = st.selectbox(
+                "Stock",
+                available_tickers,
+                index=available_tickers.index(st.session_state.selected_stock)
+                if st.session_state.selected_stock in available_tickers
+                else 0,
+                key="stock_sel_eda_stl",
+            )
+            series = pd.to_numeric(price_df[st.session_state.selected_stock], errors="coerce").dropna()
+            if len(series) < 80:
+                alert_box("info", "Not enough price history to render decomposition.")
+            else:
+                try:
+                    from statsmodels.tsa.seasonal import STL
+
+                    period = min(252, max(20, len(series) // 4))
+                    stl_result = STL(series, period=period, robust=True).fit()
+                    trend = stl_result.trend
+                    seasonal = stl_result.seasonal
+                    resid = stl_result.resid
+                except Exception:
+                    trend = series.rolling(63, min_periods=10).mean()
+                    seasonal = series - trend
+                    resid = series - trend - seasonal.rolling(20, min_periods=5).mean()
+
+                fig = make_subplots(
+                    rows=3,
+                    cols=1,
+                    shared_xaxes=True,
+                    vertical_spacing=0.045,
+                    subplot_titles=("Price / Trend", "Seasonal Component", "Residual"),
+                )
+                color = STOCK_COLORS.get(st.session_state.selected_stock, "#00d4ff")
+                fig.add_trace(go.Scatter(x=series.index, y=series, name="Close", line=dict(color=color, width=1.2)), row=1, col=1)
+                fig.add_trace(go.Scatter(x=trend.index, y=trend, name="Trend", line=dict(color="#ffaa00", width=1.7)), row=1, col=1)
+                fig.add_trace(go.Scatter(x=seasonal.index, y=seasonal, name="Seasonal", line=dict(color="#00ff88", width=1)), row=2, col=1)
+                fig.add_trace(go.Scatter(x=resid.index, y=resid, name="Residual", line=dict(color="#ff3366", width=1)), row=3, col=1)
+                fig.update_layout(**terminal_layout(f"STL Decomposition - {st.session_state.selected_stock.replace('.NS', '')}", height=620))
+                st.plotly_chart(fig, width="stretch")
+        elif chart_option == "ACF/PACF":
+            ticker_options = [ticker for ticker in STOCK_UNIVERSE["Ticker"].tolist() if ticker in price_df.columns]
+            available_tickers = ticker_options or price_df.columns.tolist()
+            st.session_state.selected_stock = st.selectbox(
+                "Stock",
+                available_tickers,
+                index=available_tickers.index(st.session_state.selected_stock)
+                if st.session_state.selected_stock in available_tickers
+                else 0,
+                key="stock_sel_eda_acf",
+            )
+            returns = pd.to_numeric(price_df[st.session_state.selected_stock], errors="coerce").pct_change().dropna()
+            if len(returns) < 30:
+                alert_box("info", "Not enough return observations to render ACF/PACF diagnostics.")
+            else:
+                from statsmodels.tsa.stattools import acf, pacf
+
+                nlags = min(30, max(5, len(returns) // 4))
+                lags = np.arange(nlags + 1)
+                acf_vals = acf(returns, nlags=nlags, fft=True)
+                pacf_vals = pacf(returns, nlags=nlags, method="ywm")
+                conf = 1.96 / np.sqrt(len(returns))
+
+                fig = make_subplots(rows=1, cols=2, subplot_titles=("ACF", "PACF"))
+                fig.add_trace(go.Bar(x=lags, y=acf_vals, name="ACF", marker_color="#00d4ff"), row=1, col=1)
+                fig.add_trace(go.Bar(x=lags, y=pacf_vals, name="PACF", marker_color="#ffaa00"), row=1, col=2)
+                for col_idx in [1, 2]:
+                    fig.add_hline(y=conf, line_dash="dot", line_color="#00ff88", opacity=0.6, row=1, col=col_idx)
+                    fig.add_hline(y=-conf, line_dash="dot", line_color="#ff3366", opacity=0.6, row=1, col=col_idx)
+                fig.update_traces(marker_line_width=0)
+                fig.update_layout(**terminal_layout(f"Return Autocorrelation - {st.session_state.selected_stock.replace('.NS', '')}", barmode="group"))
+                st.plotly_chart(fig, width="stretch")
+        elif chart_option == "Risk-Return":
+            if not summary_stats.empty and {"Ticker", "Ann_Ret%", "Ann_Vol%"}.issubset(summary_stats.columns):
+                risk_df = summary_stats.copy()
+                risk_df["Ann Return %"] = pd.to_numeric(risk_df["Ann_Ret%"], errors="coerce")
+                risk_df["Ann Vol %"] = pd.to_numeric(risk_df["Ann_Vol%"], errors="coerce")
+                risk_df["Sharpe"] = pd.to_numeric(risk_df.get("Sharpe", np.nan), errors="coerce")
+            elif not price_df.empty:
+                returns = price_df.pct_change().dropna()
+                risk_df = pd.DataFrame(
+                    {
+                        "Ticker": returns.columns,
+                        "Ann Return %": returns.mean().values * 252 * 100,
+                        "Ann Vol %": returns.std().values * np.sqrt(252) * 100,
+                    }
+                )
+                risk_df["Sharpe"] = risk_df["Ann Return %"] / risk_df["Ann Vol %"].replace(0, np.nan)
+                risk_df = risk_df.merge(STOCK_UNIVERSE[["Ticker", "Sector"]], on="Ticker", how="left")
+            else:
+                risk_df = pd.DataFrame()
+
+            if risk_df.empty:
+                alert_box("info", "Risk-return data is unavailable.")
+            else:
+                risk_df["Label"] = risk_df["Ticker"].astype(str).str.replace(".NS", "", regex=False)
+                fig = px.scatter(
+                    risk_df,
+                    x="Ann Vol %",
+                    y="Ann Return %",
+                    color="Sector" if "Sector" in risk_df.columns else None,
+                    size=risk_df["Sharpe"].abs().fillna(0.1) + 0.5,
+                    text="Label",
+                    hover_data=["Ticker", "Sharpe"] if "Sharpe" in risk_df.columns else ["Ticker"],
+                    color_discrete_sequence=list(STOCK_COLORS.values()),
+                )
+                fig.add_hline(y=0, line_dash="dot", line_color="#ff3366", opacity=0.65)
+                fig.update_traces(textposition="top center", marker=dict(line=dict(width=0)))
+                fig.update_layout(**terminal_layout("Risk-Return Landscape"))
                 st.plotly_chart(fig, width="stretch")
         else:
-            show_image(chart_map.get(chart_option, chart_map["Price Trends"]))
+            alert_box("info", f"Chart '{chart_option}' is not yet implemented as a Plotly figure.")
+
+            st.markdown("")
+            panel_header("CORRELATION ANALYSIS")
+            alert_box("info", "Correlation matrix available in chart above")
     
     st.markdown("")
     panel_header("SUMMARY STATISTICS")
@@ -1195,9 +1502,6 @@ with tab2:
     if not stationarity.empty:
             render_fixed_table(stationarity, height=420, hide_index=True)
 
-    st.markdown("")
-    panel_header("CORRELATION ANALYSIS")
-    st.info("Correlation matrix available in chart above")
 
 
 # ── TAB 3: ALPHA ENGINE ────────────────────────
@@ -1208,6 +1512,7 @@ with tab3:
         all_metrics = load_csv(str(REPORTS_DIR / "all_model_metrics.csv"))
         arima_metrics = load_csv(str(REPORTS_DIR / "arima_metrics.csv"))
         avp_df = load_csv(str(PREDICTIONS_DIR / "actual_vs_predicted.csv"))
+        forecast_df_tab3 = load_csv(str(PREDICTIONS_DIR / "all_5day_forecasts.csv"))
     
     if not all_metrics.empty:
         st.markdown("")
@@ -1229,7 +1534,7 @@ with tab3:
         st.markdown("")
         panel_header("MODEL METRICS TERMINAL")
         
-        col_t, col_m = st.columns(2)
+        col_t, col_m = st.columns([3, 3])
         with col_t:
             filter_tickers = st.multiselect("Filter Ticker", 
                                             all_metrics["Ticker"].unique().tolist() if "Ticker" in all_metrics.columns else [],
@@ -1246,6 +1551,30 @@ with tab3:
             filtered_metrics = filtered_metrics[filtered_metrics["Model"].isin(filter_models)]
         
         render_fixed_table(filtered_metrics, height=400)
+
+        st.markdown("")
+        panel_header("ENSEMBLE WEIGHTS — INVERSE RMSE")
+        w = all_metrics[all_metrics["Model"].isin(["ARIMA", "ETS", "Prophet-STL (Custom)", "LSTM"])].copy()
+        w["RMSE"] = pd.to_numeric(w["RMSE"], errors="coerce")
+        w = w.dropna(subset=["RMSE"])
+        if not w.empty and "Ticker" in w.columns:
+            w["inv"] = 1 / w["RMSE"]
+            w["weight"] = w.groupby("Ticker")["inv"].transform(lambda x: x / x.sum()) * 100
+            w["Ticker"] = w["Ticker"].astype(str).str.replace(".NS", "", regex=False)
+            fig = px.bar(
+                w,
+                x="Ticker",
+                y="weight",
+                color="Model",
+                barmode="stack",
+                color_discrete_map=MODEL_COLORS,
+                labels={"weight": "Weight (%)", "Ticker": "Stock"},
+            )
+            fig.update_traces(marker_line_width=0)
+            fig.update_layout(**terminal_layout("Ensemble Weights per Stock (%)"))
+            st.plotly_chart(fig, width="stretch")
+        else:
+            alert_box("info", "Ensemble weights unavailable: missing RMSE/model rows.")
         
         st.markdown("")
         panel_header("MODEL COMPARISON CHARTS")
@@ -1290,8 +1619,142 @@ with tab3:
                     colorbar=dict(title="RMSE"),
                 )
             )
-            fig.update_layout(**TERMINAL_LAYOUT, title="RMSE Heatmap — Model × Ticker")
+            fig.update_layout(**terminal_layout("RMSE Heatmap — Model × Ticker"))
             st.plotly_chart(fig, width="stretch")
+        elif chart_sel == "Predicted vs Actual" and not avp_df.empty:
+            ticker = st.session_state.get("selected_stock", STOCK_UNIVERSE["Ticker"].iloc[0])
+            sub = avp_df.copy()
+            if "Ticker" in sub.columns:
+                sub = sub[sub["Ticker"].astype(str) == str(ticker)].copy()
+
+            if sub.empty:
+                alert_box("info", f"No prediction rows found for {str(ticker).replace('.NS', '')}.")
+            else:
+                date_col = "Date" if "Date" in sub.columns else None
+                if date_col:
+                    sub[date_col] = pd.to_datetime(sub[date_col], errors="coerce")
+                    sub = sub.sort_values(date_col)
+
+                model_cols = [c for c in ["Actual", "ARIMA", "ETS", "Prophet-STL (Custom)", "LSTM", "Ensemble"] if c in sub.columns]
+                fig = go.Figure()
+                for model_name in model_cols:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=sub[date_col] if date_col else sub.index,
+                            y=pd.to_numeric(sub[model_name], errors="coerce"),
+                            name=model_name,
+                            line=dict(
+                                color=MODEL_COLORS.get(model_name, "#888"),
+                                width=2.5 if model_name in ("Actual", "Ensemble") else 1.2,
+                                dash="solid" if model_name == "Actual" else ("dot" if model_name == "Ensemble" else "dash"),
+                            ),
+                            hovertemplate=f"{model_name}: ₹%{{y:,.2f}}<extra></extra>",
+                        )
+                    )
+
+                fig.update_layout(
+                    **terminal_layout(
+                        f"{str(ticker).replace('.NS', '')} — Actual vs Predicted",
+                        hovermode="x unified",
+                        xaxis=dict(rangeslider=dict(visible=True), type="date"),
+                    )
+                )
+                st.plotly_chart(fig, width="stretch")
+        elif chart_sel == "5-Day Forecast" and not forecast_df_tab3.empty:
+            ticker = st.session_state.get("selected_stock", STOCK_UNIVERSE["Ticker"].iloc[0])
+            sub = forecast_df_tab3.copy()
+            if "Ticker" in sub.columns:
+                sub = sub[sub["Ticker"].astype(str) == str(ticker)].copy()
+
+            if sub.empty:
+                alert_box("info", f"No 5-day forecast rows found for {str(ticker).replace('.NS', '')}.")
+            else:
+                date_col = "Date"
+                if "Date" not in sub.columns:
+                    first_col = sub.columns[0]
+                    sub = sub.rename(columns={first_col: "Date"})
+                sub["Date"] = pd.to_datetime(sub["Date"], errors="coerce")
+                sub = sub.sort_values("Date")
+
+                fig = go.Figure()
+                for model_name, grp in sub.groupby("Model"):
+                    grp = grp.sort_values("Date")
+                    fig.add_trace(
+                        go.Scatter(
+                            x=grp["Date"],
+                            y=pd.to_numeric(grp["Forecast"], errors="coerce"),
+                            name=str(model_name),
+                            line=dict(color=MODEL_COLORS.get(str(model_name), "#00d4ff"), width=2),
+                            hovertemplate="%{x|%d %b %Y}<br>Forecast: ₹%{y:,.2f}<extra></extra>",
+                        )
+                    )
+
+                if {"Lower_95", "Upper_95"}.issubset(sub.columns):
+                    ens = sub[sub["Model"].astype(str).str.contains("Ensemble", case=False, na=False)]
+                    if not ens.empty:
+                        ens = ens.sort_values("Date")
+                        fig.add_trace(
+                            go.Scatter(
+                                x=ens["Date"],
+                                y=pd.to_numeric(ens["Upper_95"], errors="coerce"),
+                                mode="lines",
+                                line=dict(width=0),
+                                showlegend=False,
+                                hoverinfo="skip",
+                            )
+                        )
+                        fig.add_trace(
+                            go.Scatter(
+                                x=ens["Date"],
+                                y=pd.to_numeric(ens["Lower_95"], errors="coerce"),
+                                mode="lines",
+                                line=dict(width=0),
+                                fill="tonexty",
+                                fillcolor="rgba(0, 212, 255, 0.12)",
+                                name="Ensemble 95% CI",
+                                hovertemplate="95% CI: ₹%{y:,.2f}<extra></extra>",
+                            )
+                        )
+
+                fig.update_layout(
+                    **terminal_layout(
+                        f"{str(ticker).replace('.NS', '')} — 5-Day Forecast by Model",
+                        hovermode="x unified",
+                    )
+                )
+                st.plotly_chart(fig, width="stretch")
+        elif chart_sel == "ARIMA ACF" and not arima_metrics.empty:
+            p10_col = next((c for c in ["LjungBox_lag10_p", "LjungBox_lag10"] if c in arima_metrics.columns), None)
+            p20_col = next((c for c in ["LjungBox_lag20_p", "LjungBox_lag20"] if c in arima_metrics.columns), None)
+            if p10_col and p20_col and "Ticker" in arima_metrics.columns:
+                ar = arima_metrics[["Ticker", p10_col, p20_col]].copy()
+                ar[p10_col] = pd.to_numeric(ar[p10_col], errors="coerce")
+                ar[p20_col] = pd.to_numeric(ar[p20_col], errors="coerce")
+                ar["Ticker"] = ar["Ticker"].astype(str).str.replace(".NS", "", regex=False)
+
+                fig = go.Figure()
+                fig.add_trace(go.Bar(x=ar["Ticker"], y=ar[p10_col], name="Ljung-Box p (lag 10)", marker_color="#00d4ff"))
+                fig.add_trace(go.Bar(x=ar["Ticker"], y=ar[p20_col], name="Ljung-Box p (lag 20)", marker_color="#ffaa00"))
+                fig.add_hline(y=0.05, line_dash="dot", line_color="#ff3366", annotation_text="0.05 threshold")
+                fig.update_traces(marker_line_width=0)
+                fig.update_layout(**terminal_layout("ARIMA Residual Autocorrelation Check", barmode="group"))
+                st.plotly_chart(fig, width="stretch")
+            else:
+                alert_box("info", "ARIMA ACF diagnostics are unavailable in the current metrics file.")
+        elif chart_sel == "LSTM Curves" and not all_metrics.empty:
+            lstm = all_metrics[all_metrics["Model"].astype(str).str.contains("LSTM", case=False, na=False)].copy()
+            if not lstm.empty and "Ticker" in lstm.columns:
+                lstm["Ticker"] = lstm["Ticker"].astype(str).str.replace(".NS", "", regex=False)
+                lstm["RMSE"] = pd.to_numeric(lstm.get("RMSE", np.nan), errors="coerce")
+                lstm["MAE"] = pd.to_numeric(lstm.get("MAE", np.nan), errors="coerce")
+
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=lstm["Ticker"], y=lstm["RMSE"], mode="lines+markers", name="RMSE", line=dict(color="#00d4ff", width=2)))
+                fig.add_trace(go.Scatter(x=lstm["Ticker"], y=lstm["MAE"], mode="lines+markers", name="MAE", line=dict(color="#ffaa00", width=2, dash="dot")))
+                fig.update_layout(**terminal_layout("LSTM Error Curves by Ticker"))
+                st.plotly_chart(fig, width="stretch")
+            else:
+                alert_box("info", "LSTM curve data is unavailable in the current metrics file.")
         elif chart_sel == "Residuals" and not avp_df.empty:
             model_cols = [c for c in ["ARIMA", "ETS", "Prophet-STL (Custom)", "LSTM", "Ensemble"] if c in avp_df.columns]
             fig = go.Figure()
@@ -1307,7 +1770,7 @@ with tab3:
                             nbinsx=40,
                         )
                     )
-            fig.update_layout(**TERMINAL_LAYOUT, barmode="overlay", title="Residuals Distribution by Model")
+            fig.update_layout(**terminal_layout("Residuals Distribution by Model", barmode="overlay"))
             st.plotly_chart(fig, width="stretch")
         elif chart_sel == "Ensemble Weights" and not all_metrics.empty:
             rmse_data = all_metrics[all_metrics["Model"].isin(["ARIMA", "ETS", "Prophet-STL (Custom)", "LSTM"])].copy()
@@ -1326,20 +1789,21 @@ with tab3:
                         color_discrete_map=MODEL_COLORS,
                         labels={"weight": "Ensemble Weight", "Ticker": "Stock"},
                     )
-                    fig.update_layout(**TERMINAL_LAYOUT, title="Ensemble Weights (Inverse-RMSE) per Stock")
+                    fig.update_traces(marker_line_width=0)
+                    fig.update_layout(**terminal_layout("Ensemble Weights (Inverse-RMSE) per Stock"))
                     st.plotly_chart(fig, width="stretch")
                 else:
-                    show_image(chart_map.get(chart_sel))
+                    alert_box("info", f"Chart '{chart_sel}' needs more data before it can be plotted.")
             else:
-                show_image(chart_map.get(chart_sel))
+                alert_box("info", f"Chart '{chart_sel}' needs more data before it can be plotted.")
         elif chart_sel == "Metrics Bars":
             try:
                 fig = plotly_charts.plot_model_metrics_bars(all_metrics)
                 st.plotly_chart(fig, width="stretch")
             except Exception:
-                show_image(chart_map.get(chart_sel))
+                alert_box("info", f"Chart '{chart_sel}' could not be rendered as Plotly.")
         else:
-            show_image(chart_map.get(chart_sel))
+            alert_box("info", f"Chart '{chart_sel}' is not yet implemented as a Plotly figure.")
         
         st.markdown("")
         panel_header("ARIMA DIAGNOSTICS")
@@ -1356,8 +1820,7 @@ with tab4:
         avp_df = load_csv(str(PREDICTIONS_DIR / "actual_vs_predicted.csv"))
     
     panel_header("5-DAY FORWARD PRICE FORECAST | BASE: 2025-07-01")
-    st.info("FORECAST: Ensemble (inverse-RMSE weighted) of ARIMA + ETS + Prophet-STL + LSTM. "
-            "Out-of-sample from 2025-07-01.")
+    alert_box("info", "FORECAST: Ensemble (inverse-RMSE weighted) of ARIMA + ETS + Prophet-STL + LSTM. Out-of-sample from 2025-07-01.")
     
     st.markdown("")
     panel_header("SIGNAL DASHBOARD — ALL STOCKS")
@@ -1389,37 +1852,108 @@ with tab4:
     panel_header("DETAILED FORECAST — SELECT STOCK")
     
     stock_options = STOCK_UNIVERSE["Ticker"].tolist()
-    selected_stock = st.selectbox(
+    st.session_state.selected_stock = st.selectbox(
         "Stock",
         stock_options,
         index=stock_options.index(st.session_state.selected_stock) if st.session_state.selected_stock in stock_options else 0,
         label_visibility="collapsed",
-        key="selected_stock",
+        key="stock_sel_forecast",
     )
+    selected_stock = st.session_state.selected_stock
+    stock_forecasts = pd.DataFrame()
+    if not forecast_df.empty and "Ticker" in forecast_df.columns:
+        stock_forecasts = forecast_df[forecast_df["Ticker"].astype(str) == str(selected_stock)].copy()
+        if not stock_forecasts.empty:
+            if "Date" not in stock_forecasts.columns:
+                stock_forecasts = stock_forecasts.rename(columns={stock_forecasts.columns[0]: "Date"})
+            stock_forecasts["Date"] = pd.to_datetime(stock_forecasts["Date"], errors="coerce")
+            stock_forecasts["Forecast"] = pd.to_numeric(stock_forecasts.get("Forecast", np.nan), errors="coerce")
+            stock_forecasts = stock_forecasts.sort_values("Date")
+    ohlc_for_signal = fetch_ohlc(selected_stock)
+    last_close = np.nan
+    if not ohlc_for_signal.empty and "Close" in ohlc_for_signal.columns:
+        close_series = pd.to_numeric(ohlc_for_signal["Close"], errors="coerce").dropna()
+        if not close_series.empty:
+            last_close = float(close_series.iloc[-1])
     
-    col_left, col_center, col_right = st.columns(3)
+    col_left, col_center, col_right = st.columns([4, 3, 3])
     
     with col_left:
-        panel_header("5-DAY PRICE PROJECTION")
-        if not forecast_df.empty and "Ticker" in forecast_df.columns:
-            stock_forecasts = forecast_df[forecast_df["Ticker"] == selected_stock].copy()
-            if stock_forecasts.empty:
-                st.info("No forecast rows found for the selected stock.")
+        panel_header("SELECTED STOCK SNAPSHOT")
+        if stock_forecasts.empty:
+            alert_box("info", "No forecast rows found for the selected stock.")
+        else:
+            latest = stock_forecasts.dropna(subset=["Forecast"]).tail(1)
+            latest_fc = float(latest["Forecast"].iloc[0]) if not latest.empty else np.nan
+            ret_est = ((latest_fc - last_close) / last_close) * 100 if np.isfinite(last_close) and np.isfinite(latest_fc) else np.nan
+            st.metric("Latest Forecast", f"₹{latest_fc:,.2f}" if np.isfinite(latest_fc) else "—")
+            st.metric("Last Close", f"₹{last_close:,.2f}" if np.isfinite(last_close) else "—")
+            st.metric("Implied 5D Return", fmt_pct(ret_est) if np.isfinite(ret_est) else "—")
     
     with col_center:
         panel_header("SIGNAL STRENGTH")
-        st.info("Signal gauge placeholder — live calculation")
+        if stock_forecasts.empty:
+            alert_box("info", "Signal strength unavailable: no forecast rows for selected stock.")
+        else:
+            latest = stock_forecasts.dropna(subset=["Forecast"]).tail(1)
+            latest_fc = float(latest["Forecast"].iloc[0]) if not latest.empty else np.nan
+            ret_est = ((latest_fc - last_close) / last_close) * 100 if np.isfinite(last_close) and np.isfinite(latest_fc) else 0.0
+            strength = float(np.clip(50 + ret_est * 4, 0, 100))
+            fig = go.Figure(
+                go.Indicator(
+                    mode="gauge+number",
+                    value=strength,
+                    number={"suffix": "/100"},
+                    gauge={
+                        "axis": {"range": [0, 100]},
+                        "bar": {"color": "#00d4ff"},
+                        "steps": [
+                            {"range": [0, 35], "color": "rgba(255, 51, 102, 0.20)"},
+                            {"range": [35, 65], "color": "rgba(245, 170, 0, 0.20)"},
+                            {"range": [65, 100], "color": "rgba(0, 255, 136, 0.20)"},
+                        ],
+                        "threshold": {"line": {"color": "#ff3366", "width": 3}, "value": 50},
+                    },
+                )
+            )
+            fig.update_layout(**terminal_layout("Forecast Signal Gauge"))
+            st.plotly_chart(fig, width="stretch")
     
     with col_right:
         panel_header("MODEL CONSENSUS")
-        st.info("Model agreement chart placeholder")
+        if stock_forecasts.empty or "Model" not in stock_forecasts.columns:
+            alert_box("info", "Model consensus unavailable: missing model-level forecasts.")
+        else:
+            latest_model = stock_forecasts.dropna(subset=["Forecast"]).groupby("Model", as_index=False).tail(1).copy()
+            if np.isfinite(last_close):
+                latest_model["Return_%"] = (latest_model["Forecast"] - last_close) / last_close * 100
+                y_col = "Return_%"
+                y_title = "Forecast Return %"
+                hover = "%{x}: %{y:.2f}%<extra></extra>"
+            else:
+                latest_model["Return_%"] = latest_model["Forecast"]
+                y_col = "Return_%"
+                y_title = "Forecast Price"
+                hover = "%{x}: ₹%{y:,.2f}<extra></extra>"
+
+            fig = go.Figure(
+                go.Bar(
+                    x=latest_model["Model"],
+                    y=pd.to_numeric(latest_model[y_col], errors="coerce"),
+                    marker_color=[MODEL_COLORS.get(str(m), "#00d4ff") for m in latest_model["Model"]],
+                    hovertemplate=hover,
+                )
+            )
+            fig.update_traces(marker_line_width=0)
+            if y_title == "Forecast Return %":
+                fig.add_hline(y=0, line_dash="dot", line_color="#ff3366", opacity=0.6)
+            fig.update_layout(**terminal_layout("Latest Model Signals", yaxis_title=y_title))
+            st.plotly_chart(fig, width="stretch")
 
     st.markdown("")
     panel_header("5-DAY PRICE PROJECTION — FULL TABLE")
-    if not forecast_df.empty and "Ticker" in forecast_df.columns:
-        stock_forecasts = forecast_df[forecast_df["Ticker"] == selected_stock].copy()
-        if not stock_forecasts.empty:
-            render_fixed_table(stock_forecasts, height=320)
+    if not stock_forecasts.empty:
+        st.dataframe(style_forecast_table(stock_forecasts), width="stretch", height=320, hide_index=True)
     
     st.markdown("")
     panel_header("BACKTEST — ACTUAL vs PREDICTED | TEST: 2025-01-01 to 2025-06-30")
@@ -1448,10 +1982,11 @@ with tab4:
             )
 
         fig.update_layout(
-            **TERMINAL_LAYOUT,
-            title=f"{selected_stock.replace('.NS','')} — Actual vs Predicted (Test Period)",
-            hovermode="x unified",
-            xaxis=dict(rangeslider=dict(visible=True), type="date"),
+            **terminal_layout(
+                f"{selected_stock.replace('.NS','')} — Actual vs Predicted (Test Period)",
+                hovermode="x unified",
+                xaxis=dict(rangeslider=dict(visible=True), type="date"),
+            )
         )
         st.plotly_chart(fig, width="stretch")
 
@@ -1493,8 +2028,12 @@ with tab5:
     panel_header("VOLATILITY RISK TERMINAL | GARCH(1,1) MODEL")
     
     if not garch_df.empty:
-        vol_series = pd.to_numeric(garch_df.get("Current_AnnVol_pct", pd.Series(dtype=float)), errors="coerce")
-        persist_series = pd.to_numeric(garch_df.get("Persistence", pd.Series(dtype=float)), errors="coerce")
+        vol_col = next((c for c in ["Current_AnnVol_%", "Current_AnnVol_pct", "AnnVolPct", "GARCH_Vol_%"] if c in garch_df.columns), None)
+        var_col = next((c for c in ["VaR_95_%", "VaR_95_pct"] if c in garch_df.columns), None)
+        persist_col = next((c for c in ["Persistence", "GARCH_beta"] if c in garch_df.columns), None)
+
+        vol_series = pd.to_numeric(garch_df[vol_col], errors="coerce") if vol_col else pd.Series(dtype=float)
+        persist_series = pd.to_numeric(garch_df[persist_col], errors="coerce") if persist_col else pd.Series(dtype=float)
         cols = st.columns(4)
         with cols[0]:
             max_vol_idx = vol_series.idxmax() if vol_series.notna().any() else None
@@ -1506,10 +2045,11 @@ with tab5:
             kpi_card("LOWEST VOL", ticker_min, "#00ff88")
         with cols[2]:
             avg_vol = vol_series.mean()
-            kpi_card("AVG PORT VOL", fmt_pct(avg_vol), "#ffaa00")
+            kpi_card("AVG PORT VOL", fmt_pct(avg_vol) if np.isfinite(avg_vol) else "—", "#ffaa00")
         with cols[3]:
             max_persist = persist_series.max()
-            kpi_card("MAX PERSIST", f"{max_persist:.2f}", "#ff3366" if max_persist > 0.95 else "#ffaa00")
+            max_persist_text = f"{max_persist:.2f}" if np.isfinite(max_persist) else "—"
+            kpi_card("MAX PERSIST", max_persist_text, "#ff3366" if np.isfinite(max_persist) and max_persist > 0.95 else "#ffaa00")
         
         st.markdown("")
         with st.expander("📐 GARCH(1,1) Model Specification"):
@@ -1522,10 +2062,8 @@ with tab5:
         
         st.markdown("")
         plot_df = garch_df.merge(STOCK_UNIVERSE[["Ticker", "Sector"]], on="Ticker", how="left")
-        vol_col = "Current_AnnVol_pct"
-        var_col = "VaR_95_pct"
 
-        if {"Ticker", vol_col}.issubset(plot_df.columns):
+        if vol_col and {"Ticker", vol_col}.issubset(plot_df.columns):
             vol_values = pd.to_numeric(plot_df[vol_col], errors="coerce")
             var_values = pd.to_numeric(plot_df[var_col], errors="coerce") if var_col in plot_df.columns else pd.Series([np.nan] * len(plot_df))
 
@@ -1557,12 +2095,14 @@ with tab5:
                 yaxis2=dict(overlaying="y", side="right", showgrid=False, tickcolor="#ff3366", tickfont=dict(color="#ff3366")),
                 barmode="group",
             )
+            fig.update_traces(marker_line_width=0)
             st.plotly_chart(fig, width="stretch")
 
         if not portfolio_df.empty and {"Ticker", "Forecast_5d_Ret_%"}.issubset(portfolio_df.columns):
             risk_df = garch_df.merge(portfolio_df[["Ticker", "Forecast_5d_Ret_%"]], on="Ticker", how="left")
-            risk_df = risk_df.merge(STOCK_UNIVERSE[["Ticker", "Sector"]], on="Ticker", how="left")
-            if vol_col in risk_df.columns:
+            if "Sector" not in risk_df.columns:
+                risk_df = risk_df.merge(STOCK_UNIVERSE[["Ticker", "Sector"]], on="Ticker", how="left")
+            if vol_col and vol_col in risk_df.columns:
                 fig = px.scatter(
                     risk_df,
                     x=pd.to_numeric(risk_df[vol_col], errors="coerce"),
@@ -1575,7 +2115,7 @@ with tab5:
                 )
                 fig.add_hline(y=0, line_dash="dot", line_color="#ff3366", opacity=0.6)
                 fig.update_traces(textposition="top center")
-                fig.update_layout(**TERMINAL_LAYOUT, title="Risk-Return Landscape")
+                fig.update_layout(**terminal_layout("Risk-Return Landscape"))
                 st.plotly_chart(fig, width="stretch")
 
 
@@ -1609,7 +2149,7 @@ with tab6:
         render_fixed_table(display, height=400)
     
     st.markdown("")
-    col_alloc, col_sector = st.columns(2)
+    col_alloc, col_sector = st.columns([5, 5])
     
     with col_alloc:
         panel_header("WEIGHT ALLOCATION")
@@ -1641,14 +2181,16 @@ with tab6:
                     diversification_score = max(0.0, (1.0 - hhi) * 100.0)
                     st.metric("Diversification Score", f"{diversification_score:.1f}/100")
                     if float(top_sector["Weight_%"]) > 40:
-                        st.warning(
-                            f"Concentration risk: {top_sector['Sector']} holds {top_sector['Weight_%']:.1f}% of portfolio weight."
+                        alert_box(
+                            "warning",
+                            f"Concentration risk: {top_sector['Sector']} holds {top_sector['Weight_%']:.1f}% of portfolio weight.",
                         )
             except Exception:
                 sector_group = portfolio_df.groupby("Sector")["Weight_%"].sum()
                 sector_labels = sector_group.index.astype(str).str.replace(".NS", "", regex=False)
                 fig = px.bar(x=sector_labels, y=sector_group.values,
                             labels={"x": "Sector", "y": "Weight %"})
+                fig.update_traces(marker_line_width=0)
                 fig.update_layout(**TERMINAL_LAYOUT)
                 st.plotly_chart(fig, width="stretch")
     
@@ -1688,7 +2230,7 @@ with tab7:
                           "stockgro_orders.csv", "text/csv")
     
     st.markdown("")
-    col_d1, col_d2 = st.columns(2)
+    col_d1, col_d2 = st.columns([3, 2])
     
     with col_d1:
         panel_header("DAY 1 | EXECUTION CHECKLIST")
@@ -1759,15 +2301,9 @@ with tab7:
         m7.metric("Portfolio Vol", fmt_pct(safe_metric(portfolio_summary, "Portfolio_Vol_%", 18.64)))
         m8.metric("N Stocks", f"{int(safe_metric(portfolio_summary, 'N_Stocks', 8))}")
 
-    st.success("✅ Train/Test Split: 2021–2024 train | 2025-H1 test | 5-day forecast from 2025-07-01")
-    st.info(
-        "ℹ️ Prophet Disclosure: Official Prophet library not used due to pystan/Python 3.12 "
-        "incompatibility. Custom Prophet-STL reimplementation used instead."
-    )
-    st.warning(
-        "⚠️ Portfolio Note: 6 of 8 stocks had negative 5-day forecasts. Minimum-bound weights "
-        "applied to bearish stocks; ITC received maximum weight as the sole bullish forecast."
-    )
+    alert_box("info", "Train: 2021–2024 | Test: 2025-H1 | Forecast: 2025-07-01 onwards")
+    alert_box("info", "Prophet-STL: custom implementation used due to pystan/Python 3.12 incompatibility")
+    alert_box("warning", "6 of 8 stocks carry negative 5-day forecast — minimum weights applied")
 
     st.markdown("### Stock Universe")
     render_fixed_table(STOCK_UNIVERSE, height=320)
