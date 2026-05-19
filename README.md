@@ -167,28 +167,16 @@ streamlit run dashboard/app.py
 
 ---
 
-## Deploy The Dashboard
+## Live Dashboard
 
-The fastest deployment path for this repo is **Streamlit Community Cloud**.
+Access the deployed Streamlit dashboard here:
 
-1. Push the project to GitHub.
-2. Make sure `requirements.txt` includes `streamlit` and all packages used by `dashboard/app.py`.
-3. In the Streamlit Cloud app, create a new deployment from your GitHub repo.
-4. Set the main file path to `dashboard/app.py`.
-5. Deploy and verify the app loads without missing-package errors.
+Open Dashboard - https://market-intelligence-platform-2ha3yqdsagaffhvucael3w.streamlit.app/
 
-If you want a simple private deployment instead, run it on a VM or container with:
-
-```bash
-streamlit run dashboard/app.py --server.address 0.0.0.0 --server.port 8501
-```
-
-If you deploy publicly, keep in mind:
-- Live Yahoo Finance fetching depends on internet access.
-- Large model artifacts and generated outputs can make startup slower.
-- If you want faster cold starts, trim unused model files from the deployment bundle.
-
----
+Notes
+Requires an internet connection for live market data retrieval from Yahoo Finance.
+Initial load may take a few seconds if model artifacts are being loaded.
+Best viewed on a desktop or tablet for the full interactive experience.
 
 ## 🏦 Stock Universe (10 NSE Stocks — 5 Sectors)
 
